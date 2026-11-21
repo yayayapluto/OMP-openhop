@@ -4,6 +4,7 @@ import packageJson from "../package.json";
 import { stateDir } from "./paths";
 
 const SENSITIVE_KEY = /token|secret|password|authorization|cookie|api[-_]?key|credential/i;
+const CONTENT_KEY = /payload|prompt|profile|message|messages|output|response|body|headers|text|content|completion|reasoning/i;
 const SENSITIVE_TEXT = /\b(token|secret|password|authorization|cookie|api[-_]?key|credential)\s*[:=]\s*[^\s,;]+/gi;
 const URL_QUERY = /(https?:\/\/[^\s?#]+)\?[^\s]*/gi;
 const STRING_LIMIT = 200;
@@ -32,7 +33,7 @@ export function redactMetadata(value: unknown): unknown {
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value)) {
-      if (SENSITIVE_KEY.test(key) || key.toLowerCase() === "stack") continue;
+      if (SENSITIVE_KEY.test(key) || CONTENT_KEY.test(key) || key.toLowerCase() === "stack") continue;
       out[key] = redactMetadata(nested);
     }
     return out;
