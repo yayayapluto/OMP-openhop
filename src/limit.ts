@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { hopText, runHop, type HopReport } from "./hop";
+import { logEvent } from "./log";
 
 /** Providers whose upstream is opencode.ai. Other providers keep their limits. */
 export const OPENCODE_PROVIDERS: Record<string, true> = {
@@ -26,6 +27,7 @@ export type LimitMessage = {
   errorStatus?: number;
   errorMessage?: string;
   errorClassificationMessage?: string;
+  model?: string;
 };
 
 /** True for OpenCode provider errors that can be retried on a fresh IP. */
@@ -43,9 +45,32 @@ export function attachLimitHop(pi: ExtensionAPI, hop: () => Promise<HopReport> =
     const message = event.message as LimitMessage;
     if (!isOpencodeLimitError(message)) return;
     const now = Date.now();
-    if (now - lastHopAt < LIMIT_HOP_COOLDOWN_MS) return;
+    const provider = String(message.provider ?? "");
+    const model = String(message.model ?? "");
+    const elapsed = now - lastHopAt;
+    if (elapsed < LIMIT_HOP_COOLDOWN_MS) {
+      logEvent("info", "limit_hop_cooldown", {
+        provider,
+        model,
+        reason: "cooldown",
+        cooldownMs: LIMIT_HOP_COOLDOWN_MS,
+        remainingMs: LIMIT_HOP_COOLDOWN_MS - elapsed,
+      });
+      return;
+    }
     lastHopAt = now;
+    logEvent("info", "limit_hop_triggered", {
+      provider,
+      model,
+      errorStatus: message.errorStatus ?? 0,
+    });
     const report = await hop();
+    logEvent(report.ok ? "info" : "warn", "limit_hop_completed", {
+      provider,
+      model,
+      ok: report.ok,
+      timedOut: report.timedOut,
+    });
     if (report.ok && message.provider && message.model) {
       const target = ctx.models.resolve(`${message.provider}/${message.model}`);
       if (target) await ctx.setModel(target);

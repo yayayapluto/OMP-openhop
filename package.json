@@ -1,6 +1,6 @@
 {
   "name": "omp-openhop",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "OMP plugin: status, hop and doctor for a local openhop install, with automatic WARP /64 rotation on OpenCode free-tier limits",
   "type": "module",
   "main": "src/index.ts",

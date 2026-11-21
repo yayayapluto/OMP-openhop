@@ -1,5 +1,6 @@
 import { findCli } from "./paths";
 import { runCli, TEXT_CAP } from "./run";
+import { logEvent } from "./log";
 
 export const DOCTOR_TIMEOUT_MS = 60_000;
 
@@ -35,6 +36,7 @@ export function summarizeDoctor(text: string): DoctorSummary {
 export async function runDoctor(): Promise<DoctorSummary> {
   const cli = findCli();
   if (!cli.doctor) {
+    logEvent("warn", "cli_missing", { cli: "doctor" });
     return {
       ok: 0,
       warn: 0,
@@ -43,8 +45,17 @@ export async function runDoctor(): Promise<DoctorSummary> {
       text: "",
     };
   }
+  const startedAt = Date.now();
   const res = await runCli(cli.doctor, [], DOCTOR_TIMEOUT_MS);
   const summary = summarizeDoctor(res.out);
   if (res.timedOut) summary.problems.push("doctor timed out");
+  logEvent(res.timedOut || summary.fail > 0 ? "warn" : "info", "doctor_completed", {
+    durationMs: Date.now() - startedAt,
+    ok: summary.ok,
+    warn: summary.warn,
+    fail: summary.fail,
+    timedOut: res.timedOut,
+    code: res.code,
+  });
   return summary;
 }

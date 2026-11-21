@@ -1,5 +1,6 @@
 import { findCli } from "./paths";
 import { runCli } from "./run";
+import { logEvent } from "./log";
 
 export const HOP_TIMEOUT_MS = 120_000;
 
@@ -46,6 +47,7 @@ export async function runHop(onProgress?: (stage: string) => void): Promise<HopR
   }
   const cli = findCli();
   if (!cli.hop) {
+    logEvent("warn", "cli_missing", { cli: "hop" });
     return {
       ok: false,
       oldBlock: "",
@@ -56,18 +58,35 @@ export async function runHop(onProgress?: (stage: string) => void): Promise<HopR
     };
   }
   hopInFlight = (async () => {
+    const startedAt = Date.now();
+    logEvent("info", "hop_started", {});
     onProgress?.("rotating WARP /64 (this takes ~10-30s)…");
-    const res = await runCli(cli.hop!, [], HOP_TIMEOUT_MS);
-    const report = parseHopOutput(res.out);
-    if (res.timedOut) {
-      report.ok = false;
-      report.timedOut = true;
-      report.output = `${report.output}\n(hint: still rotating — run status, or the openhop app)`.trim();
-    } else if (res.code !== 0 && !report.output) {
-      report.ok = false;
-      report.output = `openhop-hop exited with code ${res.code}`;
+    try {
+      const res = await runCli(cli.hop!, [], HOP_TIMEOUT_MS);
+      const report = parseHopOutput(res.out);
+      if (res.timedOut) {
+        report.ok = false;
+        report.timedOut = true;
+        report.output = `${report.output}\n(hint: still rotating — run status, or the openhop app)`.trim();
+      } else if (res.code !== 0 && !report.output) {
+        report.ok = false;
+        report.output = `openhop-hop exited with code ${res.code}`;
+      }
+      logEvent(report.ok ? "info" : "warn", report.ok ? "hop_succeeded" : "hop_failed", {
+        durationMs: Date.now() - startedAt,
+        ok: report.ok,
+        timedOut: report.timedOut,
+        code: res.code,
+      });
+      return report;
+    } catch (err) {
+      logEvent("error", "hop_failed", {
+        durationMs: Date.now() - startedAt,
+        ok: false,
+        error: err instanceof Error ? err.message : "hop error",
+      });
+      throw err;
     }
-    return report;
   })();
   try {
     return await hopInFlight;

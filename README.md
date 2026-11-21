@@ -23,7 +23,7 @@ openhop stays a separate program. This package only reads openhop's state files 
   - [Automatic hop on OpenCode limits](#automatic-hop-on-opencode-limits)
   - [Reading the status fields](#reading-the-status-fields)
   - [Common prompts](#common-prompts)
-- [What it reads](#what-it-reads)
+- [What it reads and writes](#what-it-reads-and-writes)
 - [Architecture](#architecture)
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
@@ -38,11 +38,12 @@ openhop stays a separate program. This package only reads openhop's state files 
 - **`/openhop hop`** — rotate openhop's WARP exit address (single-flight, 120 s cap).
 - **`/openhop doctor`** — run openhop's diagnostics and open the full report in the editor.
 - **`/openhop status`** — print the same status block as the tool.
-- **Read-only by default** — status never writes anything; no keeper/guard process is started by it.
+- **Read-only by default**: status never changes openhop state. Event logging appends to `<state>/plugin.log` only when that directory already exists.
 - **Cross-platform paths** — `%LOCALAPPDATA%\openhop` on Windows, `~/.local/share/opencode-unlimited`
   (or `~/.local/share/openhop`) on Linux.
 - **Optional proxy probe** — one `cloudflare.com/cdn-cgi/trace` request through `127.0.0.1:41987`
   to confirm the exit IP and WARP status.
+- **Local JSONL log**: records action, hop, limit and doctor metadata in the openhop state directory.
 
 ## Requirements
 
@@ -235,7 +236,7 @@ If the hop is disabled or fails, run `/openhop hop` manually.
 | Force a new address | `/openhop hop` |
 | Diagnose a broken proxy | `/openhop doctor` |
 
-## What it reads
+## What it reads and writes
 
 | Path | Purpose |
 | --- | --- |
@@ -247,14 +248,17 @@ If the hop is disabled or fails, run `/openhop hop` manually.
 | `<state>/keeper.pause` | Rotation pause marker |
 | `<state>/bin/openhop-hop.cmd`, `openhop-doctor.cmd` | Windows CLIs |
 | `~/.local/bin/opencode-unlimited-hop`, `opencode-unlimited-doctor` | Linux CLIs |
+| `<state>/plugin.log` | Append-only JSONL event log written by this plugin |
 
-Nothing outside these paths is read. No credentials, cookies or model config are touched.
+Nothing outside these paths is read. The plugin writes only `<state>/plugin.log`. No credentials,
+cookies or model config are touched.
 
 ## Architecture
 
 ```text
 src/
 ├── index.ts     # extension factory: registers the openhop tool + /openhop
+├── log.ts       # JSONL event logging, redaction and kill switch
 ├── paths.ts     # platform, state dir, CLI discovery, proxy port
 ├── run.ts       # Bun.spawn wrapper, .cmd handling, port probe, JSON/heartbeat reads
 ├── hop.ts       # openhop-hop runner, output parser, single-flight guard
@@ -301,7 +305,7 @@ message_end ──> isOpencodeLimitError()
 ## Development
 
 ```bash
-bun run selfcheck          # 27 assertions: hop/doctor parsers, paths, status text, limit hop
+bun run selfcheck          # 47 assertions: parsers, paths, status text, limit hop, log redaction
 bun selfcheck.ts           # same, direct
 ```
 
@@ -344,6 +348,10 @@ git config core.hooksPath .githooks
 - The optional probe sends one request to `cloudflare.com` **through openhop's local proxy** to read
   the exit IP; it uses no credentials and is off unless `probe: true` is passed.
 - Output is capped at 200 KB before it reaches the model.
+- Plugin events go to `<state>/plugin.log` as JSON Lines with redacted keys, capped strings and no
+  stacks, prompts, model output, CLI output bodies, headers or URL query strings. Logging never creates
+  the state directory; it appends only when that directory already exists. Set `OMP_PLUGIN_LOG=0` to
+  disable all plugin file logging for the process.
 
 ## License
 
