@@ -16,6 +16,23 @@ export { runDoctor, summarizeDoctor } from "./doctor";
 export { collectStatus, statusText } from "./status";
 export { findCli, stateDir } from "./paths";
 
+const OPENHOP_ACTIONS = [
+  ["status", "proxy, heartbeats, pause, egress mode"],
+  ["hop", "rotate the WARP exit /64"],
+  ["doctor", "run openhop diagnostics (full report)"],
+] as const;
+
+export type OpenhopCompletion = { value: string; label: string; description: string };
+
+export function openhopCompletions(prefix: string): OpenhopCompletion[] {
+  const needle = prefix.trim().toLowerCase();
+  const items: OpenhopCompletion[] = [];
+  for (const [value, description] of OPENHOP_ACTIONS) {
+    if (value.startsWith(needle)) items.push({ value, label: value, description });
+  }
+  return items;
+}
+
 export default function openhopExtension(pi: ExtensionAPI) {
   const z = pi.zod;
 
@@ -77,6 +94,7 @@ export default function openhopExtension(pi: ExtensionAPI) {
 
   pi.registerCommand("openhop", {
     description: "Control openhop: /openhop status | hop | doctor",
+    getArgumentCompletions: openhopCompletions,
     handler: async (args, ctx) => {
       const action = String(args ?? "").trim().toLowerCase();
       if (action === "" || action === "status") {

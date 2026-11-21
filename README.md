@@ -167,6 +167,9 @@ hint: open the openhop app, or press "Fix everything" so the keeper/proxy runs.
 /openhop doctor
 ```
 
+Typing `/openhop ` lists the subcommands with descriptions and filters as you type (`/openhop h` →
+`hop`).
+
 - `status` prints the status block (no probe).
 - `hop` runs the single-flight rotation and notifies you with the old → new block. If it takes longer
   than 120 seconds the child process is killed and you're told to check status rather than start a

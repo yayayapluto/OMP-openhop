@@ -1,5 +1,5 @@
 /** Run: bun run selfcheck (bun selfcheck.ts) — parser + path detection, no openhop install needed. */
-import { findCli, stateDir, statusText, type StatusReport } from "./src/index";
+import { findCli, openhopCompletions, stateDir, statusText, type StatusReport } from "./src/index";
 import { parseHopOutput } from "./src/hop";
 import { summarizeDoctor } from "./src/doctor";
 
@@ -60,4 +60,11 @@ assert(text.includes("closed") && !text.includes("listening"), "status shows clo
 assert(text.includes("rotations today: 3"), "status includes rotations");
 assert(text.includes("Fix everything"), "closed proxy adds hint");
 
-console.log("selfcheck: 12 assertions passed");
+const all = openhopCompletions("");
+assert(all.length === 3, "all three actions offered when the argument is empty");
+assert(all[0].value === "status" && all[2].value === "doctor", "completion order");
+const hopOnly = openhopCompletions("h");
+assert(hopOnly.length === 1 && hopOnly[0].value === "hop", "prefix filters to hop");
+assert(openhopCompletions("zzz").length === 0, "unknown prefix yields no items");
+
+console.log("selfcheck: 16 assertions passed");
