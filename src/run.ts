@@ -1,5 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { connect } from "node:net";
+import { logEvent } from "./log";
 
 export const TEXT_CAP = 200_000;
 
@@ -66,6 +67,7 @@ export async function runCli(target: string, args: string[], timeoutMs: number):
     new Response(child.stderr).text(),
   ]);
   const code = await child.exited;
+  logEvent(code === 0 ? "info" : "warn", "cli_exit", { code, timedOut });
   clearTimeout(timer);
   const text = [out, err].filter(Boolean).join("\n").trim();
   return { code, out: text.slice(0, TEXT_CAP), timedOut };
