@@ -2,8 +2,8 @@
 
 OMP plugin that connects an [OMP](https://github.com/oh-my-pi/oh-my-pi) session to a local
 [openhop](https://openhop.cfd) install. It reports openhop's proxy/keeper/guard state, rotates the
-WARP exit `/64` on demand, and shows the full openhop doctor report — without touching OMP's own
-inference path.
+WARP exit `/64` on demand or automatically on OpenCode free-tier limits, and shows the full openhop
+doctor report — without touching OMP's own inference path.
 
 openhop stays a separate program. This package only reads openhop's state files and calls the
 `openhop-hop` / `openhop-doctor` CLIs that ship with it.
@@ -20,6 +20,7 @@ openhop stays a separate program. This package only reads openhop's state files 
   - [Daily flow (when OpenCode hits the free limit)](#daily-flow-when-opencode-hits-the-free-limit)
   - [Asking the model](#asking-the-model)
   - [`/openhop`](#openhop)
+  - [Automatic hop on OpenCode limits](#automatic-hop-on-opencode-limits)
   - [Reading the status fields](#reading-the-status-fields)
   - [Common prompts](#common-prompts)
 - [What it reads](#what-it-reads)
@@ -32,10 +33,12 @@ openhop stays a separate program. This package only reads openhop's state files 
 ## Features
 
 - **`openhop` tool** — `status`, `hop`, `doctor` actions callable by the model.
+- **Automatic hop on OpenCode limits** — one WARP `/64` rotation per limit burst on `opencode-free`,
+  `bansos` and `bansosr`; no hop for `ip-abuse` or for other providers.
 - **`/openhop hop`** — rotate openhop's WARP exit address (single-flight, 120 s cap).
 - **`/openhop doctor`** — run openhop's diagnostics and open the full report in the editor.
 - **`/openhop status`** — print the same status block as the tool.
-- **Read-only by default** — status never writes anything; no keeper/guard process is started.
+- **Read-only by default** — status never writes anything; no keeper/guard process is started by it.
 - **Cross-platform paths** — `%LOCALAPPDATA%\openhop` on Windows, `~/.local/share/opencode-unlimited`
   (or `~/.local/share/openhop`) on Linux.
 - **Optional proxy probe** — one `cloudflare.com/cdn-cgi/trace` request through `127.0.0.1:41987`
@@ -106,21 +109,21 @@ live.
 
 ### Daily flow (when OpenCode hits the free limit)
 
-1. OpenCode shows the free-usage-limit message. Usually openhop's keeper rotates the address by
-   itself and types "continue" — you don't need to do anything.
-2. If it doesn't (keeper paused, stale, or you want a manual rotation), open an OMP session and run:
+1. An OpenCode-backed provider reports a free-usage limit. The plugin detects the error and starts one
+   WARP `/64` rotation automatically, then notifies you with the old → new block.
+2. If auto-hop is disabled, or the rotation failed, run it manually in an OMP session:
 
    ```
    /openhop hop
    ```
 
-   You get a notification like:
+   Either way you get a notification like:
 
    ```text
-   Fresh WARP /64: 2a09:bac5:1:2::/64 → 2a09:bac5:9:8::/64. Re-send the message or continue.
+   openhop: Fresh WARP /64: 2a09:bac5:1:2::/64 → 2a09:bac5:9:8::/64. Re-send the message or continue.
    ```
 
-3. Go back to OpenCode and re-send your message (or type "continue").
+3. Re-send the message in the same provider (or type "continue").
 
 ### Asking the model
 
@@ -177,6 +180,40 @@ Typing `/openhop ` lists the subcommands with descriptions and filters as you ty
 - `doctor` runs `openhop-doctor`, opens the raw output in the editor, and falls back to a notification
   when no editor is available. The model gets counts of `[OK]`/`[!]`/`[X]` lines plus the problems.
 
+### Automatic hop on OpenCode limits
+
+The extension listens to OMP's `message_end` event. It rotates the WARP `/64` once when an assistant
+error comes from an OpenCode-backed provider and matches a limit:
+
+| Provider | Upstream | Auto-hop |
+| --- | --- | --- |
+| `opencode-free` (`omp-opencode-bridge`) | `https://opencode.ai/inference/v1` | Yes |
+| `bansos` (`pi-bansos`) | `https://opencode.ai` and Kilo gateway | Yes |
+| `bansosr` (`pi-bansos-router`) | Routes to `bansos` | Yes |
+| `freepi`, `9router`, `nusagate`, others | Not OpenCode | No |
+
+Matched errors: HTTP `429`, `FreeUsageLimitError`, `FreeTierError`, "OpenCode's free tier can only be
+used from within OpenCode", `X-OpenCode-Gate: ip-throttled`, and rate-limit text. `ip-abuse`,
+`abusive traffic` and `Abuse of traffic` are explicitly excluded — changing IP does not clear an
+abuse block.
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `OMP_OPENHOP_LIMIT_HOP=0` | unset (auto-hop on) | Do not register the limit listener; use `/openhop hop` manually |
+| Cooldown | 120,000 ms | One hop per burst; repeated limit errors in that window are ignored |
+
+The hop shares `runHop()` with the command, so concurrent triggers join the same rotation instead of
+racing the keeper. A notification reports the result. On success the extension reselects the model
+from the failed message, so the next prompt retries the same OpenCode model with the new `/64`
+instead of staying on a fallback provider. The turn itself is not retried.
+
+IP rotation clears address-level gating. It does **not** clear a per-model upstream quota: the
+bridge's own probe can show one free model usable and another still `429` on the same exit IP. If
+the reselected model still returns a limit, switch to a different free model; run
+`bun ~/.omp/plugins/node_modules/omp-opencode-bridge/verify.ts` to see which ones are usable.
+
+If the hop is disabled or fails, run `/openhop hop` manually.
+
 ### Reading the status fields
 
 | Field | Meaning | What to do |
@@ -222,6 +259,7 @@ src/
 ├── run.ts       # Bun.spawn wrapper, .cmd handling, port probe, JSON/heartbeat reads
 ├── hop.ts       # openhop-hop runner, output parser, single-flight guard
 ├── doctor.ts    # openhop-doctor runner, [OK]/[!]/[X] summarizer
+├── limit.ts     # message_end listener: limit classifier, cooldown, model reselection
 └── status.ts    # state assembly, optional proxy trace probe, status formatting
 selfcheck.ts     # bun run selfcheck — parsers + path detection, no install needed
 ```
@@ -248,10 +286,22 @@ collectStatus(probe?)
   └─ probe? fetch trace through the proxy (3 s timeout)
 ```
 
+Flow for auto-hop:
+
+```text
+message_end ──> isOpencodeLimitError()
+                  ├─ provider not OpenCode / not 429 or limit text → ignore
+                  └─ limit + cooldown clear
+                       ├─ runHop()            → shared single-flight rotation
+                       ├─ ctx.models.resolve() → model from failed message
+                       ├─ ctx.setModel()       → retry same model next prompt
+                       └─ ctx.ui.notify()      → "openhop: Fresh WARP /64: …"
+```
+
 ## Development
 
 ```bash
-bun run selfcheck          # 12 assertions: hop parser, doctor parser, paths, status text
+bun run selfcheck          # 26 assertions: hop/doctor parsers, paths, status text, limit hop
 bun selfcheck.ts           # same, direct
 ```
 
@@ -264,6 +314,13 @@ omp --no-extensions -e ./src/index.ts -p "Reply with exactly: ok"
 The self-check does not need openhop installed; it uses synthetic hop/doctor output copied from
 `src/zen_hop.py` and `scripts/zen-hop.sh`.
 
+The tracked pre-commit hook runs the same self-check. Enable it once after cloning:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
@@ -273,11 +330,15 @@ The self-check does not need openhop installed; it uses synthetic hop/doctor out
 | `Hop still running after 120s` | WARP rotation is slow | Check `openhop` status; don't start a second hop |
 | `cloudflare handed back the same block` | Cloudflare reused the same `/64` | Run `hop` again |
 | `doctor timed out` | `openhop-doctor` hung | Run it manually in a terminal and inspect |
+| No `openhop: …` notification on a 429 | Listener disabled or provider not OpenCode-backed | Check `OMP_OPENHOP_LIMIT_HOP`, then run `/openhop hop` manually |
+| Hop succeeded but same model still 429 | Per-model upstream quota, not address-level gating | Run the bridge probe and switch to a usable free model |
 | Extension not loaded | Not registered in OMP | Check `~/.omp/agent/config.yml` or `omp plugin link .` |
 
 ## Security notes
 
-- The plugin never opens a listener and never accepts network input.
+- The plugin opens no network listener and accepts no network input. The auto-hop hook is an
+  in-process `message_end` subscription; it can trigger a WARP rotation when an OpenCode-backed
+  provider reports a limit. Set `OMP_OPENHOP_LIMIT_HOP=0` to disable it.
 - `openhop-hop` / `openhop-doctor` are executed from fixed paths with the current environment; on
   Windows `.cmd` wrappers run through `cmd.exe` with a quoted path and no user-supplied arguments.
 - The optional probe sends one request to `cloudflare.com` **through openhop's local proxy** to read
