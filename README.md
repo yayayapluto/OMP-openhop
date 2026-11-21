@@ -38,7 +38,7 @@ openhop stays a separate program. This package only reads openhop's state files 
 - **`/openhop hop`** — rotate openhop's WARP exit address (single-flight, 120 s cap).
 - **`/openhop doctor`** — run openhop's diagnostics and open the full report in the editor.
 - **`/openhop status`** — print the same status block as the tool.
-- **Read-only by default** — status never writes anything; no keeper/guard process is started by it.
+- **Read-only by default**: status never changes openhop state. Event logging appends to `<state>/plugin.log` only when that directory already exists.
 - **Cross-platform paths** — `%LOCALAPPDATA%\openhop` on Windows, `~/.local/share/opencode-unlimited`
   (or `~/.local/share/openhop`) on Linux.
 - **Optional proxy probe** — one `cloudflare.com/cdn-cgi/trace` request through `127.0.0.1:41987`
@@ -305,7 +305,7 @@ message_end ──> isOpencodeLimitError()
 ## Development
 
 ```bash
-bun run selfcheck          # 40 assertions: parsers, paths, status text, limit hop, log redaction
+bun run selfcheck          # 47 assertions: parsers, paths, status text, limit hop, log redaction
 bun selfcheck.ts           # same, direct
 ```
 
@@ -349,8 +349,9 @@ git config core.hooksPath .githooks
   the exit IP; it uses no credentials and is off unless `probe: true` is passed.
 - Output is capped at 200 KB before it reaches the model.
 - Plugin events go to `<state>/plugin.log` as JSON Lines with redacted keys, capped strings and no
-  stacks, prompts, model output, CLI output bodies, headers or URL query strings. Set
-  `OMP_PLUGIN_LOG=0` to disable all plugin file logging for the process.
+  stacks, prompts, model output, CLI output bodies, headers or URL query strings. Logging never creates
+  the state directory; it appends only when that directory already exists. Set `OMP_PLUGIN_LOG=0` to
+  disable all plugin file logging for the process.
 
 ## License
 

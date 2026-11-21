@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import packageJson from "../package.json";
 import { stateDir } from "./paths";
@@ -8,8 +8,17 @@ const SENSITIVE_TEXT = /\b(token|secret|password|authorization|cookie|api[-_]?ke
 const URL_QUERY = /(https?:\/\/[^\s?#]+)\?[^\s]*/gi;
 const STRING_LIMIT = 200;
 const RESERVED_KEYS = ["ts", "level", "event", "plugin", "version"] as const;
+const ACTION_WHITELIST: Record<string, true> = {
+  status: true,
+  hop: true,
+  doctor: true,
+};
 
 export type LogLevel = "info" | "warn" | "error";
+export function safeAction(value: unknown, fallback = "unknown"): string {
+  const action = String(value ?? "").trim().toLowerCase();
+  return ACTION_WHITELIST[action] ? action : fallback;
+}
 
 function cleanString(value: string): string {
   const withoutQuery = value.replace(URL_QUERY, "$1");
@@ -43,6 +52,7 @@ export function logEvent(
 ): void {
   if (process.env.OMP_PLUGIN_LOG === "0") return;
   try {
+    if (!existsSync(dir)) return;
     const redacted = redactMetadata(metadata) as Record<string, unknown>;
     for (const key of RESERVED_KEYS) delete redacted[key];
     const entry = {
@@ -53,7 +63,6 @@ export function logEvent(
       version: packageJson.version,
       ...redacted,
     };
-    mkdirSync(dir, { recursive: true });
     appendFileSync(pluginLogPath(dir), `${JSON.stringify(entry)}\n`, "utf8");
   } catch {
     // Best effort: logging never enters plugin control flow.

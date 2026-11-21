@@ -11,7 +11,7 @@ import { runDoctor } from "./doctor";
 import { hopText, runHop } from "./hop";
 import { attachLimitHop } from "./limit";
 import { collectStatus, statusText } from "./status";
-import { logEvent } from "./log";
+import { logEvent, safeAction } from "./log";
 
 export { parseHopOutput, runHop } from "./hop";
 export { runDoctor, summarizeDoctor } from "./doctor";
@@ -52,7 +52,7 @@ export default function openhopExtension(pi: ExtensionAPI) {
     }),
     async execute(_toolCallId, params, _signal, onUpdate, ctx) {
       const action = String(params.action || "").toLowerCase();
-      logEvent("info", "tool_invoked", { action, probe: params.probe === true });
+      logEvent("info", "tool_invoked", { action: safeAction(params.action), probe: params.probe === true });
       if (action === "status") {
         const status = await collectStatus(params.probe === true);
         return {
@@ -101,7 +101,7 @@ export default function openhopExtension(pi: ExtensionAPI) {
     getArgumentCompletions: openhopCompletions,
     handler: async (args, ctx) => {
       const action = String(args ?? "").trim().toLowerCase();
-      logEvent("info", "command_invoked", { action: action || "status" });
+      logEvent("info", "command_invoked", { action: safeAction(args, "status") });
       if (action === "" || action === "status") {
         ctx.ui.notify(statusText(await collectStatus(false)), "info");
         return;

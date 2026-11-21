@@ -67,8 +67,8 @@ export async function runCli(target: string, args: string[], timeoutMs: number):
     new Response(child.stderr).text(),
   ]);
   const code = await child.exited;
-  logEvent(code === 0 ? "info" : "warn", "cli_exit", { code, timedOut });
   clearTimeout(timer);
+  logEvent(code === 0 ? "info" : "warn", "cli_exit", { code, timedOut });
   const text = [out, err].filter(Boolean).join("\n").trim();
   return { code, out: text.slice(0, TEXT_CAP), timedOut };
 }
