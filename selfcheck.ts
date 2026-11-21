@@ -184,6 +184,8 @@ try {
     "selfcheck_event",
     {
       action: "hop",
+      payload: "SECRET_PAYLOAD",
+      prompt: "SECRET_PROMPT",
       token: secretMarker,
       apiKey: "hunter2",
       password: "pw",
@@ -233,6 +235,13 @@ try {
       !logText.includes("session=xyz"),
     "sensitive values never reach disk",
   );
+  assert(
+    !logText.includes("SECRET_PAYLOAD") &&
+      !logText.includes("SECRET_PROMPT") &&
+      !("payload" in entry) &&
+      !("prompt" in entry),
+    "payload and prompt keys dropped",
+  );
   assert(nested.long === "A".repeat(200), "long strings truncated");
   assert(nested.url === "https://example.com/path", "URL query strings stripped");
   assert(entry.inline === "token=[redacted] secret=[redacted]", "inline sensitive values masked");
@@ -264,4 +273,4 @@ try {
   rmSync(logDir, { recursive: true, force: true });
 }
 
-console.log("selfcheck: 47 assertions passed");
+console.log("selfcheck: 48 assertions passed");
