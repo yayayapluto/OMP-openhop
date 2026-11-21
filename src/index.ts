@@ -9,12 +9,14 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import { runDoctor } from "./doctor";
 import { hopText, runHop } from "./hop";
+import { attachLimitHop } from "./limit";
 import { collectStatus, statusText } from "./status";
 
 export { parseHopOutput, runHop } from "./hop";
 export { runDoctor, summarizeDoctor } from "./doctor";
 export { collectStatus, statusText } from "./status";
 export { findCli, stateDir } from "./paths";
+export { attachLimitHop, isOpencodeLimitError, OPENCODE_PROVIDERS } from "./limit";
 
 const OPENHOP_ACTIONS = [
   ["status", "proxy, heartbeats, pause, egress mode"],
@@ -36,7 +38,7 @@ export function openhopCompletions(prefix: string): OpenhopCompletion[] {
 export default function openhopExtension(pi: ExtensionAPI) {
   const z = pi.zod;
 
-  pi.setLabel("openhop");
+  if (process.env.OMP_OPENHOP_LIMIT_HOP !== "0") attachLimitHop(pi);
 
   pi.registerTool({
     name: "openhop",
