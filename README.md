@@ -13,13 +13,16 @@ openhop stays a separate program. This package only reads openhop's state files 
 - [Features](#features)
 - [Requirements](#requirements)
 - [Install](#install)
-  - [From npm](#from-npm)
-  - [Link a local checkout](#link-a-local-checkout)
-  - [Load a single file](#load-a-single-file)
+  - [Step 1 — Install openhop itself (prerequisite)](#step-1--install-openhop-itself-prerequisite)
+  - [Step 2 — Install the plugin into OMP](#step-2--install-the-plugin-into-omp)
+  - [Step 3 — Verify it loaded](#step-3--verify-it-loaded)
 - [Usage](#usage)
-  - [The `openhop` tool](#the-openhop-tool)
+  - [Daily flow (when OpenCode hits the free limit)](#daily-flow-when-opencode-hits-the-free-limit)
+  - [Asking the model](#asking-the-model)
   - [`/hop`](#hop)
   - [`/doctor`](#doctor)
+  - [Reading the status fields](#reading-the-status-fields)
+  - [Common prompts](#common-prompts)
 - [What it reads](#what-it-reads)
 - [Architecture](#architecture)
 - [Development](#development)
@@ -48,13 +51,28 @@ openhop stays a separate program. This package only reads openhop's state files 
 
 ## Install
 
-### From npm
+### Step 1 — Install openhop itself (prerequisite)
+
+The plugin only talks to openhop; openhop must exist first.
+
+1. Download and install it from [openhop.cfd](https://openhop.cfd) (Windows installer, or
+   `install.sh` on Linux).
+2. Open the openhop app once and press **Fix everything**. This starts the keeper, the guard and the
+   local proxy on `127.0.0.1:41987`.
+3. Leave it running in the tray.
+
+### Step 2 — Install the plugin into OMP
+
+Pick one:
+
+**From the marketplace (recommended):**
 
 ```bash
+omp plugin marketplace add yayayapluto/OMP-openhop
 omp plugin install omp-openhop
 ```
 
-### Link a local checkout
+**From a local checkout:**
 
 ```bash
 git clone https://github.com/yayayapluto/OMP-openhop.git
@@ -62,9 +80,7 @@ cd OMP-openhop
 omp plugin link .
 ```
 
-### Load a single file
-
-OMP can load one extension file directly:
+**Load one file directly (quick test):**
 
 ```bash
 omp --no-extensions -e ./src/index.ts -p "hello"
@@ -73,15 +89,49 @@ omp --no-extensions -e ./src/index.ts -p "hello"
 To load it in every session, register it in `~/.omp/agent/config.yml` under `extensions:` or copy it
 to `~/.omp/agent/extensions/`.
 
+### Step 3 — Verify it loaded
+
+```bash
+omp plugin list
+```
+
+Then inside any OMP session type `/doctor`. If you see a report instead of an error, the plugin is
+live.
+
 ## Usage
 
-### The `openhop` tool
+### Daily flow (when OpenCode hits the free limit)
 
-The model calls it like any other tool:
+1. OpenCode shows the free-usage-limit message. Usually openhop's keeper rotates the address by
+   itself and types "continue" — you don't need to do anything.
+2. If it doesn't (keeper paused, stale, or you want a manual rotation), open an OMP session and run:
+
+   ```
+   /hop
+   ```
+
+   You get a notification like:
+
+   ```text
+   Fresh WARP /64: 2a09:bac5:1:2::/64 → 2a09:bac5:9:8::/64. Re-send the message or continue.
+   ```
+
+3. Go back to OpenCode and re-send your message (or type "continue").
+
+### Asking the model
+
+The `openhop` tool is callable by the model like any other tool, so plain requests work:
+
+```text
+check openhop status
+openhop status with a proxy probe
+rotate openhop
+run openhop doctor and tell me what's broken
+```
 
 | Action | Purpose | Notes |
 | --- | --- | --- |
-| `status` | Print install path, proxy listen state, keeper/guard heartbeat age, pause flag, egress mode, rotations today | `probe: true` adds one trace request through the proxy |
+| `status` | Install path, proxy listen state, keeper/guard heartbeat age, pause flag, egress mode, rotations today | `probe: true` adds one trace request through the proxy |
 | `hop` | Rotate the WARP `/64` via `openhop-hop` | Single-flight: a second call joins the running hop |
 | `doctor` | Run `openhop-doctor` | Full text opens in the editor; the model gets a compact summary |
 
@@ -121,7 +171,28 @@ a second hop.
 ```
 
 Runs `openhop-doctor`, opens the raw output in the editor, and falls back to a notification when no
-editor is available.
+editor is available. The model gets a count of `[OK]`/`[!]`/`[X]` lines plus the problem lines.
+
+### Reading the status fields
+
+| Field | Meaning | What to do |
+| --- | --- | --- |
+| `proxy … listening` | openhop's proxy is up on `127.0.0.1:41987` | Nothing |
+| `proxy … closed` | Keeper/proxy not running | Open the app, press "Fix everything" |
+| `keeper heartbeat: Xs ago` | Last keeper tick | Older than a few minutes → keeper is stuck or stopped |
+| `rotation paused: yes` | `keeper.pause` file exists | openhop intentionally paused it; unpause in the app |
+| `egress mode: warp` | Current routing mode | `tor`/`proxy` are alternatives configured in the app |
+| `rotations today: N` | Hops the guard counted today | Quota used on new addresses |
+| `probe: ok (ip=…, warp=on)` | Live check through the proxy | Confirms the exit IP actually works |
+
+### Common prompts
+
+| You want | Type |
+| --- | --- |
+| Check everything is alive | `openhop status` |
+| Prove the exit IP works | `openhop status with probe` |
+| Force a new address | `/hop` |
+| Diagnose a broken proxy | `/doctor` |
 
 ## What it reads
 
