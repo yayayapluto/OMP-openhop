@@ -91,13 +91,21 @@ assert(
 );
 assert(!isOpencodeLimitError({ role: "assistant", provider: "freepi", errorStatus: 429 }), "other providers ignored");
 assert(
-  !isOpencodeLimitError({
+  isOpencodeLimitError({
     role: "assistant",
     provider: "opencode-free",
-    errorStatus: 429,
+    errorStatus: 403,
     errorMessage: "X-OpenCode-Gate: ip-abuse",
   }),
-  "ip-abuse is not hoppable",
+  "ip-abuse is hoppable",
+);
+assert(
+  !isOpencodeLimitError({
+    role: "assistant",
+    provider: "freepi",
+    errorMessage: "X-OpenCode-Gate: ip-abuse",
+  }),
+  "ip-abuse on other providers is ignored",
 );
 assert(
   !isOpencodeLimitError({ role: "assistant", provider: "opencode-free", errorMessage: "all good" }),
@@ -160,4 +168,4 @@ assert(hopCalls === 1, "non-opencode provider never hops");
 assert(ext.notices.length === 1 && ext.notices[0].includes("Fresh WARP /64"), "hop result notified");
 assert(ext.selected.length === 1 && ext.selected[0] === "opencode-free/big-pickle", "failed model reselected after hop");
 
-console.log("selfcheck: 26 assertions passed");
+console.log("selfcheck: 27 assertions passed");

@@ -33,8 +33,8 @@ openhop stays a separate program. This package only reads openhop's state files 
 ## Features
 
 - **`openhop` tool** — `status`, `hop`, `doctor` actions callable by the model.
-- **Automatic hop on OpenCode limits** — one WARP `/64` rotation per limit burst on `opencode-free`,
-  `bansos` and `bansosr`; no hop for `ip-abuse` or for other providers.
+- **Automatic hop on OpenCode limits**: one WARP `/64` rotation per limit burst on `opencode-free`,
+  `bansos` and `bansosr`, including `ip-abuse` gates. Other providers are ignored.
 - **`/openhop hop`** — rotate openhop's WARP exit address (single-flight, 120 s cap).
 - **`/openhop doctor`** — run openhop's diagnostics and open the full report in the editor.
 - **`/openhop status`** — print the same status block as the tool.
@@ -193,9 +193,9 @@ error comes from an OpenCode-backed provider and matches a limit:
 | `freepi`, `9router`, `nusagate`, others | Not OpenCode | No |
 
 Matched errors: HTTP `429`, `FreeUsageLimitError`, `FreeTierError`, "OpenCode's free tier can only be
-used from within OpenCode", `X-OpenCode-Gate: ip-throttled`, and rate-limit text. `ip-abuse`,
-`abusive traffic` and `Abuse of traffic` are explicitly excluded — changing IP does not clear an
-abuse block.
+used from within OpenCode", `X-OpenCode-Gate: ip-throttled`, `X-OpenCode-Gate: ip-abuse`, `abusive
+traffic`, `Abuse of traffic`, and rate-limit text. `ip-abuse` rotates the WARP `/64` like any other
+gate; if the upstream keeps blocking the new address, run `/openhop hop` again after the cooldown.
 
 | Setting | Default | Effect |
 | --- | --- | --- |
@@ -301,7 +301,7 @@ message_end ──> isOpencodeLimitError()
 ## Development
 
 ```bash
-bun run selfcheck          # 26 assertions: hop/doctor parsers, paths, status text, limit hop
+bun run selfcheck          # 27 assertions: hop/doctor parsers, paths, status text, limit hop
 bun selfcheck.ts           # same, direct
 ```
 
