@@ -14,7 +14,8 @@ export const LIMIT_HOP_COOLDOWN_MS = 120_000;
 const LIMIT_TEXT = [
   /free\s+usage\s+limit/i,
   /freeusage_limit/i,
-  /x-opencode-gate:\s*ip-throttled/i,
+  /x-opencode-gate:\s*ip-(?:throttled|abuse)/i,
+  /ip[- ]abuse|abusive traffic|abuse of traffic/i,
   /opencode(?:'s)?\s+free\s+tier/i,
   /rate\s*limit/i,
 ];
@@ -27,12 +28,11 @@ export type LimitMessage = {
   errorClassificationMessage?: string;
 };
 
-/** True only for provider errors that an IP rotation can plausibly clear. */
+/** True for OpenCode provider errors that can be retried on a fresh IP. */
 export function isOpencodeLimitError(message: LimitMessage | undefined | null): boolean {
   if (!message || message.role !== "assistant") return false;
   if (!OPENCODE_PROVIDERS[String(message.provider ?? "").toLowerCase()]) return false;
   const text = `${message.errorMessage ?? ""} ${message.errorClassificationMessage ?? ""}`;
-  if (/ip[- ]abuse|abusive traffic|abuse of traffic/i.test(text)) return false;
   if (message.errorStatus === 429) return true;
   return LIMIT_TEXT.some((pattern) => pattern.test(text));
 }
