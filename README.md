@@ -65,11 +65,10 @@ The plugin only talks to openhop; openhop must exist first.
 
 Pick one:
 
-**From the marketplace (recommended):**
+**From GitHub (recommended — the npm package is not published yet):**
 
 ```bash
-omp plugin marketplace add yayayapluto/OMP-openhop
-omp plugin install omp-openhop
+omp plugin install github:yayayapluto/OMP-openhop
 ```
 
 **From a local checkout:**
@@ -86,8 +85,13 @@ omp plugin link .
 omp --no-extensions -e ./src/index.ts -p "hello"
 ```
 
-To load it in every session, register it in `~/.omp/agent/config.yml` under `extensions:` or copy it
-to `~/.omp/agent/extensions/`.
+To load it in every session once installed, `omp plugin enable omp-openhop`; to pin a single file
+instead, register it in `~/.omp/agent/config.yml` under `extensions:` or copy it to
+`~/.omp/agent/extensions/`.
+
+> Marketplace note: `omp plugin marketplace add yayayapluto/OMP-openhop` registers the catalog, but
+> `omp plugin install omp-openhop` resolves the npm name `omp-openhop`, which 404s until the package
+> is published. Use the GitHub form above meanwhile.
 
 ### Step 3 — Verify it loaded
 
