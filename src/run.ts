@@ -42,10 +42,11 @@ export function portOpen(port: number, timeoutMs = 600): Promise<boolean> {
   return promise;
 }
 
-/** Run an openhop CLI (.cmd through cmd.exe on Windows — Bun cannot exec it directly). */
+/** Run an openhop CLI (.cmd through cmd.exe on Windows — Bun cannot exec it directly).
+ *  `call` keeps paths with spaces intact; bare quoted paths are rejected by cmd. */
 export async function runCli(target: string, args: string[], timeoutMs: number): Promise<CliResult> {
   const isCmd = /\.(cmd|bat)$/i.test(target);
-  const cmd = isCmd ? ["cmd.exe", "/d", "/s", "/c", `"${target}"`] : [target];
+  const cmd = isCmd ? ["cmd.exe", "/d", "/s", "/c", "call", target] : [target];
   const child = Bun.spawn([...cmd, ...args], {
     stdout: "pipe",
     stderr: "pipe",

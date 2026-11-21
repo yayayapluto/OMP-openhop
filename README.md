@@ -19,8 +19,7 @@ openhop stays a separate program. This package only reads openhop's state files 
 - [Usage](#usage)
   - [Daily flow (when OpenCode hits the free limit)](#daily-flow-when-opencode-hits-the-free-limit)
   - [Asking the model](#asking-the-model)
-  - [`/hop`](#hop)
-  - [`/doctor`](#doctor)
+  - [`/openhop`](#openhop)
   - [Reading the status fields](#reading-the-status-fields)
   - [Common prompts](#common-prompts)
 - [What it reads](#what-it-reads)
@@ -33,8 +32,9 @@ openhop stays a separate program. This package only reads openhop's state files 
 ## Features
 
 - **`openhop` tool** — `status`, `hop`, `doctor` actions callable by the model.
-- **`/hop`** — rotate openhop's WARP exit address (single-flight, 120 s cap).
-- **`/doctor`** — run openhop's diagnostics and open the full report in the editor.
+- **`/openhop hop`** — rotate openhop's WARP exit address (single-flight, 120 s cap).
+- **`/openhop doctor`** — run openhop's diagnostics and open the full report in the editor.
+- **`/openhop status`** — print the same status block as the tool.
 - **Read-only by default** — status never writes anything; no keeper/guard process is started.
 - **Cross-platform paths** — `%LOCALAPPDATA%\openhop` on Windows, `~/.local/share/opencode-unlimited`
   (or `~/.local/share/openhop`) on Linux.
@@ -99,7 +99,7 @@ instead, register it in `~/.omp/agent/config.yml` under `extensions:` or copy it
 omp plugin list
 ```
 
-Then inside any OMP session type `/doctor`. If you see a report instead of an error, the plugin is
+Then inside any OMP session run `/openhop doctor`. If you see a report instead of an error, the plugin is
 live.
 
 ## Usage
@@ -111,7 +111,7 @@ live.
 2. If it doesn't (keeper paused, stale, or you want a manual rotation), open an OMP session and run:
 
    ```
-   /hop
+   /openhop hop
    ```
 
    You get a notification like:
@@ -158,24 +158,21 @@ proxy 127.0.0.1:41987: closed
 hint: open the openhop app, or press "Fix everything" so the keeper/proxy runs.
 ```
 
-### `/hop`
+### `/openhop`
 
 ```
-/hop
+/openhop            # same as /openhop status
+/openhop status
+/openhop hop
+/openhop doctor
 ```
 
-Runs the same single-flight hop as the tool and notifies you with the old → new block. If it takes
-longer than 120 seconds the child process is killed and you're told to check status rather than start
-a second hop.
-
-### `/doctor`
-
-```
-/doctor
-```
-
-Runs `openhop-doctor`, opens the raw output in the editor, and falls back to a notification when no
-editor is available. The model gets a count of `[OK]`/`[!]`/`[X]` lines plus the problem lines.
+- `status` prints the status block (no probe).
+- `hop` runs the single-flight rotation and notifies you with the old → new block. If it takes longer
+  than 120 seconds the child process is killed and you're told to check status rather than start a
+  second hop.
+- `doctor` runs `openhop-doctor`, opens the raw output in the editor, and falls back to a notification
+  when no editor is available. The model gets counts of `[OK]`/`[!]`/`[X]` lines plus the problems.
 
 ### Reading the status fields
 
@@ -195,8 +192,8 @@ editor is available. The model gets a count of `[OK]`/`[!]`/`[X]` lines plus the
 | --- | --- |
 | Check everything is alive | `openhop status` |
 | Prove the exit IP works | `openhop status with probe` |
-| Force a new address | `/hop` |
-| Diagnose a broken proxy | `/doctor` |
+| Force a new address | `/openhop hop` |
+| Diagnose a broken proxy | `/openhop doctor` |
 
 ## What it reads
 
@@ -217,7 +214,7 @@ Nothing outside these paths is read. No credentials, cookies or model config are
 
 ```text
 src/
-├── index.ts     # extension factory: registers the openhop tool + /hop + /doctor
+├── index.ts     # extension factory: registers the openhop tool + /openhop
 ├── paths.ts     # platform, state dir, CLI discovery, proxy port
 ├── run.ts       # Bun.spawn wrapper, .cmd handling, port probe, JSON/heartbeat reads
 ├── hop.ts       # openhop-hop runner, output parser, single-flight guard

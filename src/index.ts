@@ -75,27 +75,33 @@ export default function openhopExtension(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("hop", {
-    description: "Rotate openhop's WARP exit address (/64)",
-    handler: async (_args, ctx) => {
-      const report = await runHop();
-      ctx.ui.notify(hopText(report), report.ok ? "info" : "warning");
-    },
-  });
-
-  pi.registerCommand("doctor", {
-    description: "Run openhop doctor and show the full report",
-    handler: async (_args, ctx) => {
-      const summary = await runDoctor();
-      if (!summary.text) {
-        ctx.ui.notify(summary.problems[0] || "doctor produced no output", "warning");
+  pi.registerCommand("openhop", {
+    description: "Control openhop: /openhop status | hop | doctor",
+    handler: async (args, ctx) => {
+      const action = String(args ?? "").trim().toLowerCase();
+      if (action === "" || action === "status") {
+        ctx.ui.notify(statusText(await collectStatus(false)), "info");
         return;
       }
-      try {
-        await ctx.ui.editor("openhop doctor", summary.text);
-      } catch {
-        ctx.ui.notify(summary.text.split(/\r?\n/).slice(0, 8).join("\n"), "info");
+      if (action === "hop") {
+        const report = await runHop();
+        ctx.ui.notify(hopText(report), report.ok ? "info" : "warning");
+        return;
       }
+      if (action === "doctor") {
+        const summary = await runDoctor();
+        if (!summary.text) {
+          ctx.ui.notify(summary.problems[0] || "doctor produced no output", "warning");
+          return;
+        }
+        try {
+          await ctx.ui.editor("openhop doctor", summary.text);
+        } catch {
+          ctx.ui.notify(summary.text.split(/\r?\n/).slice(0, 8).join("\n"), "info");
+        }
+        return;
+      }
+      ctx.ui.notify("Usage: /openhop status | hop | doctor", "warning");
     },
   });
 }
