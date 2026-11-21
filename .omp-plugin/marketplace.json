@@ -1,0 +1,15 @@
+{
+  "name": "omp-openhop",
+  "description": "OMP plugin: status, hop and doctor for a local openhop install (WARP /64 rotation for OpenCode free-tier limits).",
+  "owner": {
+    "name": "yayayapluto"
+  },
+  "plugins": [
+    {
+      "name": "omp-openhop",
+      "source": "./",
+      "version": "1.0.0",
+      "description": "Reads openhop state and controls its hop/doctor CLIs from an OMP session: /hop, /doctor, and an openhop tool."
+    }
+  ]
+}
