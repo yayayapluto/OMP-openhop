@@ -38,7 +38,8 @@ export async function collectStatus(probe = false): Promise<StatusReport> {
   try {
     const res = await fetch("https://cloudflare.com/cdn-cgi/trace", {
       proxy: `http://127.0.0.1:${PROXY_PORT}`,
-      signal: AbortSignal.timeout(3000),
+      // WARP tunnels routinely need 3-6 s for DNS + TLS; a 3 s cap produced false failures.
+      signal: AbortSignal.timeout(12_000),
       headers: { "User-Agent": "omp-openhop" },
     });
     const body = (await res.text()).slice(0, 4096);
